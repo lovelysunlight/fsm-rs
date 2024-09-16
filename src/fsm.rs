@@ -1,4 +1,4 @@
-use crate::{errors::FSMError, event::Event};
+use crate::{error::FSMError, event::Event};
 use std::{borrow::Cow, collections::HashMap, fmt::Display, hash::Hash, str::FromStr};
 
 type BoxClosure<'a, K, V, E> = Box<dyn Fn(&Event<K, V>) -> Result<(), E> + 'a>;
@@ -297,7 +297,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{Action, EnumTag, EventDesc, Hook, FSM};
-    use crate::{errors::FSMError, event::Event};
+    use crate::{error::FSMError, event::Event};
     use std::{
         borrow::Cow,
         collections::HashMap,
