@@ -1,7 +1,13 @@
 [package]
-name = "rust-lib"
+name = "fsm-rs"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = [
+    "packages/fsm-macros"
+]
+
 [dependencies]
 thiserror = "1.0"
+fsm-macros = { path = "packages/fsm-macros" }

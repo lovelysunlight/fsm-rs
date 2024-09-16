@@ -298,10 +298,10 @@ where
 mod tests {
     use super::{Action, EnumTag, EventDesc, Hook, FSM};
     use crate::{error::FSMError, event::Event};
+    use fsm_macros::Display;
     use std::{
         borrow::Cow,
         collections::HashMap,
-        fmt::Display,
         str::FromStr,
         sync::atomic::{AtomicU32, Ordering},
     };
@@ -313,7 +313,7 @@ mod tests {
         CustomeError(&'static str),
     }
 
-    #[derive(Debug, Clone, Hash, PartialEq, Eq)]
+    #[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
     enum StateTag {
         Opened,
         Closed,
@@ -325,11 +325,6 @@ mod tests {
                 StateTag::Opened => Cow::Borrowed("opened"),
                 StateTag::Closed => Cow::Borrowed("closed"),
             }
-        }
-    }
-    impl Display for StateTag {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}", self.name())
         }
     }
     impl FromStr for StateTag {
@@ -344,7 +339,7 @@ mod tests {
         }
     }
 
-    #[derive(Debug, Clone, Hash, PartialEq, Eq)]
+    #[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
     enum EventTag {
         Open,
         Close,
@@ -355,11 +350,6 @@ mod tests {
                 EventTag::Open => Cow::Borrowed("open"),
                 EventTag::Close => Cow::Borrowed("close"),
             }
-        }
-    }
-    impl Display for EventTag {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}", self.name())
         }
     }
     impl FromStr for EventTag {
