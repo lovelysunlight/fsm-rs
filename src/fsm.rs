@@ -1,5 +1,5 @@
 use crate::{errors::FSMError, event::Event};
-use std::{borrow::Cow, collections::HashMap, hash::Hash};
+use std::{borrow::Cow, collections::HashMap, fmt::Display, hash::Hash, str::FromStr};
 
 type BoxClosure<'a, K, V, E> = Box<dyn Fn(&Event<K, V>) -> Result<(), E> + 'a>;
 pub struct Action<'a, K, V, E>(BoxClosure<'a, K, V, E>);
@@ -10,17 +10,17 @@ impl<'a, K, V, E> Action<'a, K, V, E> {
     }
 }
 
-pub trait StateTag: ToString + Clone + Hash + PartialEq + Eq {
+pub trait EnumTag: FromStr + Display + Clone + Hash + PartialEq + Eq {
     fn name(&self) -> Cow<'_, str>;
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum Hook<S: AsRef<str>, T: StateTag> {
-    Before(S),
-    After(S),
-    Leave(T),
-    Enter(T),
-    Custom(S),
+pub enum Hook<T: EnumTag, S: EnumTag> {
+    Before(T),
+    After(T),
+    Leave(S),
+    Enter(S),
+    Custom(&'static str),
 
     BeforeEvent,
     AfterEvent,
@@ -42,21 +42,21 @@ pub enum CallbackType {
 // The event can have one or more source states that is valid for performing
 // the transition. If the FSM is in one of the source states it will end up in
 // the specified destination state, calling all defined callbacks as it goes.
-pub struct EventDesc<S, T>
+pub struct EventDesc<T, S>
 where
-    S: AsRef<str> + Clone + PartialEq + Eq + Hash,
-    T: StateTag,
+    T: EnumTag,
+    S: EnumTag,
 {
     // Name is the event name used when calling for a transition.
-    pub name: S,
+    pub name: T,
 
     // Src is a slice of source states that the FSM must be in to perform a
     // state transition.
-    pub src: Vec<T>,
+    pub src: Vec<S>,
 
     // Dst is the destination state that the FSM will be in if the transition
     // succeeds.
-    pub dst: T,
+    pub dst: S,
 }
 
 // EKey is a struct key used for storing the transition map.
@@ -96,14 +96,14 @@ impl<'a, K, V, E> FSM<'a, K, V, E>
 where
     E: std::error::Error,
 {
-    pub fn new<S, T>(
-        initial: T,
-        events: Vec<EventDesc<S, T>>,
-        callback_iter: HashMap<Hook<S, T>, Action<'a, K, V, E>>,
+    pub fn new<T, S>(
+        initial: S,
+        events: Vec<EventDesc<T, S>>,
+        callback_iter: HashMap<Hook<T, S>, Action<'a, K, V, E>>,
     ) -> Self
     where
-        S: AsRef<str> + Clone + PartialEq + Eq + Hash,
-        T: StateTag,
+        T: EnumTag,
+        S: EnumTag,
     {
         let mut all_events = HashMap::new();
         let mut all_states = HashMap::new();
@@ -114,7 +114,7 @@ where
             for src in e.src {
                 transitions.insert(
                     EKey {
-                        event: e.name.as_ref().to_string(),
+                        event: e.name.to_string(),
                         src: src.to_string(),
                     },
                     e.dst.to_string(),
@@ -129,8 +129,8 @@ where
             let (target, callback_type) = match name {
                 Hook::BeforeEvent => ("".to_string(), CallbackType::BeforeEvent),
                 Hook::AfterEvent => ("".to_string(), CallbackType::AfterEvent),
-                Hook::Before(t) => (t.as_ref().to_string(), CallbackType::BeforeEvent),
-                Hook::After(t) => (t.as_ref().to_string(), CallbackType::AfterEvent),
+                Hook::Before(t) => (t.to_string(), CallbackType::BeforeEvent),
+                Hook::After(t) => (t.to_string(), CallbackType::AfterEvent),
 
                 Hook::LeaveState => ("".to_string(), CallbackType::LeaveState),
                 Hook::EnterState => ("".to_string(), CallbackType::EnterState),
@@ -138,14 +138,19 @@ where
                 Hook::Enter(t) => (t.to_string(), CallbackType::EnterState),
 
                 Hook::Custom(t) => {
-                    let callback_type = if all_states.contains_key(t.as_ref()) {
+                    let target = t.to_string();
+                    let callback_type = if all_states.contains_key(&target) {
                         CallbackType::EnterState
-                    } else if all_events.contains_key(&t) {
-                        CallbackType::AfterEvent
+                    } else if let Ok(t) = T::from_str(t) {
+                        if all_events.contains_key(&t) {
+                            CallbackType::AfterEvent
+                        } else {
+                            CallbackType::None
+                        }
                     } else {
                         CallbackType::None
                     };
-                    (t.as_ref().to_string(), callback_type)
+                    (target, callback_type)
                 }
             };
 
@@ -291,11 +296,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{Action, EventDesc, Hook, StateTag, FSM};
+    use super::{Action, EnumTag, EventDesc, Hook, FSM};
     use crate::{errors::FSMError, event::Event};
     use std::{
         borrow::Cow,
         collections::HashMap,
+        fmt::Display,
+        str::FromStr,
         sync::atomic::{AtomicU32, Ordering},
     };
     use thiserror::Error;
@@ -307,39 +314,80 @@ mod tests {
     }
 
     #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-    enum State {
+    enum StateTag {
         Opened,
         Closed,
     }
 
-    impl StateTag for State {
+    impl EnumTag for StateTag {
         fn name(&self) -> Cow<'_, str> {
             match self {
-                State::Opened => Cow::Borrowed("opened"),
-                State::Closed => Cow::Borrowed("closed"),
+                StateTag::Opened => Cow::Borrowed("opened"),
+                StateTag::Closed => Cow::Borrowed("closed"),
             }
         }
     }
-    impl ToString for State {
-        fn to_string(&self) -> String {
-            return self.name().to_string();
+    impl Display for StateTag {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.name())
+        }
+    }
+    impl FromStr for StateTag {
+        type Err = MyError;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "opened" => Ok(Self::Opened),
+                "closed" => Ok(Self::Closed),
+                _ => Err(MyError::CustomeError("invalid event name")),
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Hash, PartialEq, Eq)]
+    enum EventTag {
+        Open,
+        Close,
+    }
+    impl EnumTag for EventTag {
+        fn name(&self) -> Cow<'_, str> {
+            match self {
+                EventTag::Open => Cow::Borrowed("open"),
+                EventTag::Close => Cow::Borrowed("close"),
+            }
+        }
+    }
+    impl Display for EventTag {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.name())
+        }
+    }
+    impl FromStr for EventTag {
+        type Err = MyError;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s {
+                "open" => Ok(Self::Open),
+                "close" => Ok(Self::Close),
+                _ => Err(MyError::CustomeError("invalid event name")),
+            }
         }
     }
 
     #[test]
     fn test_fsm_state() {
         let mut fsm: FSM<u32, u32, MyError> = FSM::new(
-            State::Closed,
+            StateTag::Closed,
             vec![
                 EventDesc {
-                    name: "open",
-                    src: vec![State::Closed],
-                    dst: State::Opened,
+                    name: EventTag::Open,
+                    src: vec![StateTag::Closed],
+                    dst: StateTag::Opened,
                 },
                 EventDesc {
-                    name: "close",
-                    src: vec![State::Opened],
-                    dst: State::Closed,
+                    name: EventTag::Close,
+                    src: vec![StateTag::Opened],
+                    dst: StateTag::Closed,
                 },
             ],
             HashMap::new(),
@@ -365,30 +413,30 @@ mod tests {
     fn test_fsm_before_event_fail() {
         let callbacks = HashMap::from([
             (
-                Hook::<&str, State>::BeforeEvent,
+                Hook::<EventTag, StateTag>::BeforeEvent,
                 Action(Box::new(|_e: &Event<u32, u32>| -> Result<(), MyError> {
                     Err(MyError::CustomeError("before event fail"))
                 })),
             ),
             (
-                Hook::<&str, State>::AfterEvent,
+                Hook::<EventTag, StateTag>::AfterEvent,
                 Action(Box::new(|_e: &Event<u32, u32>| -> Result<(), MyError> {
                     Err(MyError::CustomeError("after event fail"))
                 })),
             ),
         ]);
         let mut fsm: FSM<u32, u32, MyError> = FSM::new(
-            State::Closed,
+            StateTag::Closed,
             vec![
                 EventDesc {
-                    name: "open",
-                    src: vec![State::Closed],
-                    dst: State::Opened,
+                    name: EventTag::Open,
+                    src: vec![StateTag::Closed],
+                    dst: StateTag::Opened,
                 },
                 EventDesc {
-                    name: "close",
-                    src: vec![State::Opened],
-                    dst: State::Closed,
+                    name: EventTag::Close,
+                    src: vec![StateTag::Opened],
+                    dst: StateTag::Closed,
                 },
             ],
             callbacks,
@@ -407,23 +455,23 @@ mod tests {
     #[test]
     fn test_fsm_leave_state_fail() {
         let callbacks = HashMap::from([(
-            Hook::<&str, State>::LeaveState,
+            Hook::<EventTag, StateTag>::LeaveState,
             Action(Box::new(|_e: &Event<u32, u32>| -> Result<(), MyError> {
                 Err(MyError::CustomeError("leave state fail"))
             })),
         )]);
         let mut fsm: FSM<u32, u32, MyError> = FSM::new(
-            State::Closed,
+            StateTag::Closed,
             vec![
                 EventDesc {
-                    name: "open",
-                    src: vec![State::Closed],
-                    dst: State::Opened,
+                    name: EventTag::Open,
+                    src: vec![StateTag::Closed],
+                    dst: StateTag::Opened,
                 },
                 EventDesc {
-                    name: "close",
-                    src: vec![State::Opened],
-                    dst: State::Closed,
+                    name: EventTag::Close,
+                    src: vec![StateTag::Opened],
+                    dst: StateTag::Closed,
                 },
             ],
             callbacks,
@@ -443,30 +491,30 @@ mod tests {
     fn test_fsm_ignore_after_fail() {
         let callbacks = HashMap::from([
             (
-                Hook::<&str, State>::AfterEvent,
+                Hook::<EventTag, StateTag>::AfterEvent,
                 Action(Box::new(|_e: &Event<u32, u32>| -> Result<(), MyError> {
                     Err(MyError::CustomeError("after event fail"))
                 })),
             ),
             (
-                Hook::<&str, State>::EnterState,
+                Hook::<EventTag, StateTag>::EnterState,
                 Action(Box::new(|_e: &Event<u32, u32>| -> Result<(), MyError> {
                     Err(MyError::CustomeError("enter state fail"))
                 })),
             ),
         ]);
         let mut fsm: FSM<u32, u32, MyError> = FSM::new(
-            State::Closed,
+            StateTag::Closed,
             vec![
                 EventDesc {
-                    name: "open",
-                    src: vec![State::Closed],
-                    dst: State::Opened,
+                    name: EventTag::Open,
+                    src: vec![StateTag::Closed],
+                    dst: StateTag::Opened,
                 },
                 EventDesc {
-                    name: "close",
-                    src: vec![State::Opened],
-                    dst: State::Closed,
+                    name: EventTag::Close,
+                    src: vec![StateTag::Opened],
+                    dst: StateTag::Closed,
                 },
             ],
             callbacks,
@@ -513,7 +561,7 @@ mod tests {
                 })),
             ),
             (
-                Hook::Before("open"),
+                Hook::Before(EventTag::Open),
                 Action(Box::new(|_e: &Event<u32, u32>| -> Result<(), MyError> {
                     assert_eq!(0, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -521,7 +569,7 @@ mod tests {
                 })),
             ),
             (
-                Hook::After("open"),
+                Hook::After(EventTag::Open),
                 Action(Box::new(|_e: &Event<u32, u32>| -> Result<(), MyError> {
                     assert_eq!(4, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -531,17 +579,17 @@ mod tests {
         ]);
 
         let mut fsm = FSM::new(
-            State::Closed,
+            StateTag::Closed,
             vec![
                 EventDesc {
-                    name: "open",
-                    src: vec![State::Closed],
-                    dst: State::Opened,
+                    name: EventTag::Open,
+                    src: vec![StateTag::Closed],
+                    dst: StateTag::Opened,
                 },
                 EventDesc {
-                    name: "close",
-                    src: vec![State::Opened],
-                    dst: State::Closed,
+                    name: EventTag::Close,
+                    src: vec![StateTag::Opened],
+                    dst: StateTag::Closed,
                 },
             ],
             callbacks,
@@ -590,7 +638,7 @@ mod tests {
                 })),
             ),
             (
-                Hook::Leave(State::Opened),
+                Hook::Leave(StateTag::Opened),
                 Action(Box::new(|_e: &Event<u32, u32>| -> Result<(), MyError> {
                     assert_eq!(1, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -598,7 +646,7 @@ mod tests {
                 })),
             ),
             (
-                Hook::Enter(State::Closed),
+                Hook::Enter(StateTag::Closed),
                 Action(Box::new(|_e: &Event<u32, u32>| -> Result<(), MyError> {
                     assert_eq!(3, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -608,17 +656,17 @@ mod tests {
         ]);
 
         let mut fsm = FSM::new(
-            State::Opened,
+            StateTag::Opened,
             vec![
                 EventDesc {
-                    name: "open",
-                    src: vec![State::Closed],
-                    dst: State::Opened,
+                    name: EventTag::Open,
+                    src: vec![StateTag::Closed],
+                    dst: StateTag::Opened,
                 },
                 EventDesc {
-                    name: "close",
-                    src: vec![State::Opened],
-                    dst: State::Closed,
+                    name: EventTag::Close,
+                    src: vec![StateTag::Opened],
+                    dst: StateTag::Closed,
                 },
             ],
             callbacks,
@@ -635,7 +683,7 @@ mod tests {
         let counter = AtomicU32::new(0);
         let callbacks = HashMap::from([
             (
-                Hook::Before("open"),
+                Hook::Before(EventTag::Open),
                 Action(Box::new(|_e: &Event<u32, u32>| -> Result<(), MyError> {
                     assert_eq!(0, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -651,7 +699,7 @@ mod tests {
                 })),
             ),
             (
-                Hook::Before("close"),
+                Hook::Before(EventTag::Close),
                 Action(Box::new(|_e: &Event<u32, u32>| -> Result<(), MyError> {
                     assert_eq!(2, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -669,17 +717,17 @@ mod tests {
         ]);
 
         let mut fsm = FSM::new(
-            State::Closed,
+            StateTag::Closed,
             vec![
                 EventDesc {
-                    name: "open",
-                    src: vec![State::Closed],
-                    dst: State::Opened,
+                    name: EventTag::Open,
+                    src: vec![StateTag::Closed],
+                    dst: StateTag::Opened,
                 },
                 EventDesc {
-                    name: "close",
-                    src: vec![State::Opened],
-                    dst: State::Closed,
+                    name: EventTag::Close,
+                    src: vec![StateTag::Opened],
+                    dst: StateTag::Closed,
                 },
             ],
             callbacks,
