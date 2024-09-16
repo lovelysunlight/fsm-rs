@@ -1,8 +1,14 @@
 use std::fmt::Display;
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum FSMError<S: Display> {
+    #[error("no transition with error: {0}")]
+    NoTransitionWithError(S),
+
+    #[error("no transition")]
+    NoTransition,
+
     #[error("internal error: {0}")]
     InternalError(S),
 
