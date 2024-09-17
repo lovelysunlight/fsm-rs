@@ -2,9 +2,6 @@ mod error;
 mod event;
 mod fsm;
 
-#[cfg(feature = "derive")]
-pub use strum_macros::{Display, EnumString};
-
 pub use error::FSMError;
 pub use {fsm::Action, fsm::CallbackType, fsm::EnumType, fsm::EventDesc, fsm::Hook, fsm::FSM};
 
