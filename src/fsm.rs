@@ -91,7 +91,7 @@ where
 {
     pub fn new<T, S>(
         initial: S,
-        events: Vec<EventDesc<T, S>>,
+        events: impl IntoIterator<Item = EventDesc<T, S>>,
         hooks: impl IntoIterator<Item = (HookType<T, S>, F)>,
     ) -> Self
     where
@@ -102,7 +102,7 @@ where
         let mut all_states = HashMap::new();
         let mut transitions = HashMap::new();
 
-        for e in events.iter() {
+        for e in events {
             all_events.insert(e.name.to_string(), true);
             for src in e.src.iter() {
                 transitions.insert(
@@ -220,7 +220,7 @@ where
 
     // is returns true if state is the current state.
     pub fn is<S: EnumType>(&self, state: S) -> bool {
-        self.current.eq(&state.to_string())
+        self.current.eq(state.as_ref())
     }
 
     // can returns true if event can occur in the current state.
@@ -365,13 +365,19 @@ mod tests {
                 HashMap::new(),
             );
             assert_eq!("closed", fsm.get_current());
+            assert!(fsm.is(StateTag::Closed));
 
+            assert!(fsm.can(EventTag::Open));
             assert!(fsm.on_event(EventTag::Open, Some(&HashMap::new())).is_ok());
             assert_eq!("opened", fsm.get_current());
+            assert!(fsm.is(StateTag::Opened));
 
+            assert!(fsm.can(EventTag::Close));
             assert!(fsm.on_event(EventTag::Close, Some(&HashMap::new())).is_ok());
             assert_eq!("closed", fsm.get_current());
+            assert!(fsm.is(StateTag::Closed));
 
+            assert!(!fsm.can(EventTag::Close));
             let ret = fsm.on_event(EventTag::Close, None);
             assert!(ret.is_err());
             assert_eq!(
@@ -379,6 +385,7 @@ mod tests {
                 FSMError::InvalidEvent("close".to_string(), "closed".to_string())
             );
             assert_eq!("closed", fsm.get_current());
+            assert!(fsm.is(StateTag::Closed));
         }
 
         {
@@ -759,21 +766,21 @@ mod tests {
                 }),
             ),
         ]);
-
+        let events = [
+            EventDesc {
+                name: EventTag::Open,
+                src: vec![StateTag::Closed],
+                dst: StateTag::Opened,
+            },
+            EventDesc {
+                name: EventTag::Close,
+                src: vec![StateTag::Opened],
+                dst: StateTag::Closed,
+            },
+        ];
         let mut fsm = FSM::new(
             StateTag::Closed,
-            vec![
-                EventDesc {
-                    name: EventTag::Open,
-                    src: vec![StateTag::Closed],
-                    dst: StateTag::Opened,
-                },
-                EventDesc {
-                    name: EventTag::Close,
-                    src: vec![StateTag::Opened],
-                    dst: StateTag::Closed,
-                },
-            ],
+            events,
             callbacks,
         );
         dbg!("{:?}", &fsm);
