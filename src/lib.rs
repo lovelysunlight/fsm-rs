@@ -1,9 +1,11 @@
+mod action;
 mod error;
 mod event;
 mod fsm;
 
 pub use error::FSMError;
-pub use {fsm::Action, fsm::CallbackType, fsm::EnumType, fsm::EventDesc, fsm::Hook, fsm::FSM};
+pub use action::Action;
+pub use {fsm::CallbackType, fsm::EnumType, fsm::EventDesc, fsm::Hook, fsm::FSM};
 
 #[cfg(test)]
 mod tests {
