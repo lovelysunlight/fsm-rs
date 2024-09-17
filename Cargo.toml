@@ -3,11 +3,13 @@ name = "fsm-rs"
 version = "0.1.0"
 edition = "2021"
 
-[workspace]
-members = [
-    "packages/fsm-macros"
-]
+[features]
+default = []
+derive = ["dep:strum"]
 
 [dependencies]
 thiserror = "1.0"
-fsm-macros = { path = "packages/fsm-macros" }
+strum = { version = "0.26", features = ["derive"], optional = true }
+
+[dev-dependencies]
+strum = { version = "0.26", features = ["derive"] }

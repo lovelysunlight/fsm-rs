@@ -1,5 +1,5 @@
 use crate::{error::FSMError, event::Event};
-use std::{borrow::Cow, collections::HashMap, fmt::Display, hash::Hash, str::FromStr};
+use std::{collections::HashMap, fmt::Display, hash::Hash, str::FromStr};
 
 type BoxClosure<'a, K, V, E> = Box<dyn Fn(&Event<K, V>) -> Result<(), E> + 'a>;
 pub struct Action<'a, K, V, E>(BoxClosure<'a, K, V, E>);
@@ -10,12 +10,10 @@ impl<'a, K, V, E> Action<'a, K, V, E> {
     }
 }
 
-pub trait EnumTag: FromStr + Display + Clone + Hash + PartialEq + Eq {
-    fn name(&self) -> Cow<'_, str>;
-}
+pub trait EnumType: FromStr + Display + Clone + Hash + PartialEq + Eq {}
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum Hook<T: EnumTag, S: EnumTag> {
+pub enum Hook<T: EnumType, S: EnumType> {
     Before(T),
     After(T),
     Leave(S),
@@ -44,8 +42,8 @@ pub enum CallbackType {
 // the specified destination state, calling all defined callbacks as it goes.
 pub struct EventDesc<T, S>
 where
-    T: EnumTag,
-    S: EnumTag,
+    T: EnumType,
+    S: EnumType,
 {
     // Name is the event name used when calling for a transition.
     pub name: T,
@@ -102,8 +100,8 @@ where
         callback_iter: HashMap<Hook<T, S>, Action<'a, K, V, E>>,
     ) -> Self
     where
-        T: EnumTag,
-        S: EnumTag,
+        T: EnumType,
+        S: EnumType,
     {
         let mut all_events = HashMap::new();
         let mut all_states = HashMap::new();
@@ -296,15 +294,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{Action, EnumTag, EventDesc, Hook, FSM};
+    use super::{Action, EnumType, EventDesc, Hook, FSM};
     use crate::{error::FSMError, event::Event};
-    use fsm_macros::Display;
     use std::{
-        borrow::Cow,
         collections::HashMap,
-        str::FromStr,
         sync::atomic::{AtomicU32, Ordering},
     };
+    use strum::{Display, EnumString};
     use thiserror::Error;
 
     #[derive(Debug, Error)]
@@ -313,55 +309,47 @@ mod tests {
         CustomeError(&'static str),
     }
 
-    #[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
+    #[derive(Display, EnumString, Debug, Clone, Hash, PartialEq, Eq)]
     enum StateTag {
+        #[strum(serialize = "opened")]
         Opened,
+        #[strum(serialize = "closed")]
         Closed,
     }
 
-    impl EnumTag for StateTag {
-        fn name(&self) -> Cow<'_, str> {
-            match self {
-                StateTag::Opened => Cow::Borrowed("opened"),
-                StateTag::Closed => Cow::Borrowed("closed"),
-            }
-        }
-    }
-    impl FromStr for StateTag {
-        type Err = MyError;
+    impl EnumType for StateTag {}
 
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            match s {
-                "opened" => Ok(Self::Opened),
-                "closed" => Ok(Self::Closed),
-                _ => Err(MyError::CustomeError("invalid event name")),
-            }
-        }
-    }
-
-    #[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
+    #[derive(Display, EnumString, Debug, Clone, Hash, PartialEq, Eq)]
     enum EventTag {
+        #[strum(serialize = "open")]
         Open,
+        #[strum(serialize = "close")]
         Close,
     }
-    impl EnumTag for EventTag {
-        fn name(&self) -> Cow<'_, str> {
-            match self {
-                EventTag::Open => Cow::Borrowed("open"),
-                EventTag::Close => Cow::Borrowed("close"),
-            }
-        }
-    }
-    impl FromStr for EventTag {
-        type Err = MyError;
+    impl EnumType for EventTag {}
 
-        fn from_str(s: &str) -> Result<Self, Self::Err> {
-            match s {
-                "open" => Ok(Self::Open),
-                "close" => Ok(Self::Close),
-                _ => Err(MyError::CustomeError("invalid event name")),
-            }
-        }
+    #[test]
+    fn test_fsm_state_parse() {
+        let fsm: FSM<u32, u32, MyError> = FSM::new(
+            StateTag::Closed,
+            vec![
+                EventDesc {
+                    name: EventTag::Open,
+                    src: vec![StateTag::Closed],
+                    dst: StateTag::Opened,
+                },
+                EventDesc {
+                    name: EventTag::Close,
+                    src: vec![StateTag::Opened],
+                    dst: StateTag::Closed,
+                },
+            ],
+            HashMap::new(),
+        );
+        let state: StateTag = fsm.get_current().parse().unwrap();
+        assert_eq!(StateTag::Closed, state);
+
+        assert!(fsm.get_current().parse::<EventTag>().is_err());
     }
 
     #[test]
