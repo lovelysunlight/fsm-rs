@@ -1,6 +1,6 @@
 use fsm_rs::{Closure, EnumType, EventDesc, Hook, FSM};
 use std::collections::HashMap;
-use strum::{Display, EnumString};
+use strum::Display;
 
 fn main() {
     let mut fsm: FSM<Vec<u32>, _> = FSM::new(
@@ -42,7 +42,7 @@ fn main() {
     println!("{}", fsm.get_current());
 }
 
-#[derive(Display, EnumString, Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
 enum StateTag {
     #[strum(serialize = "opened")]
     Opened,
@@ -51,7 +51,7 @@ enum StateTag {
 }
 impl EnumType for StateTag {}
 
-#[derive(Display, EnumString, Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
 enum EventTag {
     #[strum(serialize = "open")]
     Open,
@@ -67,8 +67,6 @@ pub enum MyError {
 
 impl std::fmt::Display for MyError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        // We could use our macro here, but this way we don't take a dependency on the
-        // macros crate.
         match self {
             MyError::Unknown => write!(f, "unknown error"),
         }
