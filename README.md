@@ -15,8 +15,9 @@ $ cargo add fsm-rs
 
 From examples/basic:
 ```rust
-use fsm_rs::{Closure, EnumType, EventDesc, Hook, FSM};
+use fsm_rs::{Closure, EventDesc, FSMEvent, FSMState, HookType, FSM};
 use std::collections::HashMap;
+use strum::AsRefStr;
 use strum::Display;
 
 fn main() {
@@ -36,46 +37,48 @@ fn main() {
         ],
         HashMap::from([
             (
-                Hook::BeforeEvent,
+                HookType::BeforeEvent,
                 Closure::new(|_e| -> Result<(), MyError> { Ok(()) }),
             ),
             (
-                Hook::AfterEvent,
+                HookType::AfterEvent,
                 Closure::new(|_e| -> Result<(), MyError> { Ok(()) }),
             ),
         ]),
     );
     println!("{}", fsm.get_current());
 
-    assert!(fsm.on_event("open", None).is_ok());
+    assert!(fsm.on_event(EventTag::Open, None).is_ok());
     println!("{}", fsm.get_current());
 
-    assert!(fsm.on_event("close", None).is_ok());
+    assert!(fsm.on_event(EventTag::Close, None).is_ok());
     println!("{}", fsm.get_current());
 
-    let ret = fsm.on_event("close", None);
-    assert!(ret.is_err());
-    println!("{:?}", ret.err().unwrap());
-    println!("{}", fsm.get_current());
+    {
+        let ret = fsm.on_event(EventTag::Close, None);
+        assert!(ret.is_err());
+        println!("{:?}", ret.err().unwrap());
+        println!("{}", fsm.get_current());
+    }
 }
 
-#[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Display, AsRefStr, Debug, Clone, Hash, PartialEq, Eq)]
 enum StateTag {
     #[strum(serialize = "opened")]
     Opened,
     #[strum(serialize = "closed")]
     Closed,
 }
-impl EnumType for StateTag {}
+impl FSMState for StateTag {}
 
-#[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Display, AsRefStr, Debug, Clone, Hash, PartialEq, Eq)]
 enum EventTag {
     #[strum(serialize = "open")]
     Open,
     #[strum(serialize = "close")]
     Close,
 }
-impl EnumType for EventTag {}
+impl FSMEvent for EventTag {}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum MyError {
