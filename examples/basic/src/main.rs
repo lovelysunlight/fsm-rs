@@ -1,9 +1,9 @@
-use strum::{Display, EnumString};
-use fsm_rs::{EnumType, EventDesc, FSM};
+use fsm_rs::{Closure, EnumType, EventDesc, Hook, FSM};
 use std::collections::HashMap;
+use strum::{Display, EnumString};
 
 fn main() {
-    let mut fsm: FSM<u32, u32, MyError> = FSM::new(
+    let mut fsm: FSM<Vec<u32>, _> = FSM::new(
         StateTag::Closed,
         vec![
             EventDesc {
@@ -17,20 +17,29 @@ fn main() {
                 dst: StateTag::Closed,
             },
         ],
-        HashMap::new(),
+        HashMap::from([
+            (
+                Hook::BeforeEvent,
+                Closure::new(|_e| -> Result<(), MyError> { Ok(()) }),
+            ),
+            (
+                Hook::AfterEvent,
+                Closure::new(|_e| -> Result<(), MyError> { Ok(()) }),
+            ),
+        ]),
     );
-    dbg!("{}", fsm.get_current());
+    println!("{}", fsm.get_current());
 
     assert!(fsm.on_event("open", None).is_ok());
-    dbg!("{}", fsm.get_current());
+    println!("{}", fsm.get_current());
 
     assert!(fsm.on_event("close", None).is_ok());
-    dbg!("{}", fsm.get_current());
+    println!("{}", fsm.get_current());
 
     let ret = fsm.on_event("close", None);
     assert!(ret.is_err());
-    dbg!("{:?}", ret.err().unwrap());
-    dbg!("{}", fsm.get_current());
+    println!("{:?}", ret.err().unwrap());
+    println!("{}", fsm.get_current());
 }
 
 #[derive(Display, EnumString, Debug, Clone, Hash, PartialEq, Eq)]

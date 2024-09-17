@@ -1,7 +1,7 @@
 use crate::{action::Action, error::FSMError, event::Event};
-use std::{collections::HashMap, fmt::Display, hash::Hash, str::FromStr};
+use std::{collections::HashMap, fmt::Display, hash::Hash};
 
-pub trait EnumType: FromStr + Display + Clone + Hash + PartialEq + Eq {}
+pub trait EnumType: Display + Clone + Hash + PartialEq + Eq {}
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Hook<T: EnumType, S: EnumType> {
@@ -70,7 +70,7 @@ struct CKey {
     callback_type: CallbackType,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FSM<I, F: Action<I>> {
     _marker: std::marker::PhantomData<I>,
 
@@ -102,9 +102,9 @@ where
         let mut all_states = HashMap::new();
         let mut transitions = HashMap::new();
 
-        for e in events {
-            all_events.insert(e.name.clone(), true);
-            for src in e.src {
+        for e in events.iter() {
+            all_events.insert(e.name.to_string(), true);
+            for src in e.src.iter() {
                 transitions.insert(
                     EKey {
                         event: e.name.to_string(),
@@ -131,19 +131,14 @@ where
                 Hook::Enter(t) => (t.to_string(), CallbackType::EnterState),
 
                 Hook::Custom(t) => {
-                    let target = t.to_string();
-                    let callback_type = if all_states.contains_key(&target) {
+                    let callback_type = if all_states.contains_key(t) {
                         CallbackType::EnterState
-                    } else if let Ok(t) = T::from_str(t) {
-                        if all_events.contains_key(&t) {
-                            CallbackType::AfterEvent
-                        } else {
-                            CallbackType::None
-                        }
+                    } else if all_events.contains_key(t) {
+                        CallbackType::AfterEvent
                     } else {
                         CallbackType::None
                     };
-                    (target, callback_type)
+                    (t.to_string(), callback_type)
                 }
             };
 
@@ -293,7 +288,7 @@ mod tests {
         collections::HashMap,
         sync::atomic::{AtomicU32, Ordering},
     };
-    use strum::{Display, EnumString};
+    use strum::Display;
     use thiserror::Error;
 
     #[derive(Debug, Error)]
@@ -302,7 +297,7 @@ mod tests {
         CustomeError(&'static str),
     }
 
-    #[derive(Display, EnumString, Debug, Clone, Hash, PartialEq, Eq)]
+    #[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
     enum StateTag {
         #[strum(serialize = "opened")]
         Opened,
@@ -312,7 +307,7 @@ mod tests {
 
     impl EnumType for StateTag {}
 
-    #[derive(Display, EnumString, Debug, Clone, Hash, PartialEq, Eq)]
+    #[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
     enum EventTag {
         #[strum(serialize = "open")]
         Open,
@@ -323,29 +318,6 @@ mod tests {
 
     type FSMWithHashMap<'a> = FSM<HashMap<u32, u32>, Closure<'a, HashMap<u32, u32>, MyError>>;
     type FSMWithVec<'a> = FSM<Vec<u32>, Closure<'a, Vec<u32>, MyError>>;
-
-    #[test]
-    fn test_fsm_state_parse() {
-        let fsm: FSMWithHashMap = FSM::new(
-            StateTag::Closed,
-            vec![
-                EventDesc {
-                    name: EventTag::Open,
-                    src: vec![StateTag::Closed],
-                    dst: StateTag::Opened,
-                },
-                EventDesc {
-                    name: EventTag::Close,
-                    src: vec![StateTag::Opened],
-                    dst: StateTag::Closed,
-                },
-            ],
-            HashMap::new(),
-        );
-        let state: StateTag = fsm.get_current().parse().unwrap();
-        assert_eq!(StateTag::Closed, state);
-        assert!(fsm.get_current().parse::<EventTag>().is_err());
-    }
 
     #[test]
     fn test_fsm_state() {
@@ -423,15 +395,15 @@ mod tests {
         let callbacks = HashMap::from([
             (
                 Hook::<EventTag, StateTag>::BeforeEvent,
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     Err(MyError::CustomeError("before event fail"))
-                })),
+                }),
             ),
             (
                 Hook::<EventTag, StateTag>::AfterEvent,
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     Err(MyError::CustomeError("after event fail"))
-                })),
+                }),
             ),
         ]);
         let mut fsm: FSMWithHashMap = FSM::new(
@@ -465,9 +437,9 @@ mod tests {
     fn test_fsm_leave_state_fail() {
         let callbacks = HashMap::from([(
             Hook::<EventTag, StateTag>::LeaveState,
-            Closure(Box::new(|_e| -> Result<(), MyError> {
+            Closure::new(|_e| -> Result<(), MyError> {
                 Err(MyError::CustomeError("leave state fail"))
-            })),
+            }),
         )]);
         let mut fsm: FSMWithHashMap = FSM::new(
             StateTag::Closed,
@@ -501,15 +473,15 @@ mod tests {
         let callbacks = HashMap::from([
             (
                 Hook::<EventTag, StateTag>::AfterEvent,
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     Err(MyError::CustomeError("after event fail"))
-                })),
+                }),
             ),
             (
                 Hook::<EventTag, StateTag>::EnterState,
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     Err(MyError::CustomeError("enter state fail"))
-                })),
+                }),
             ),
         ]);
         let mut fsm: FSMWithHashMap = FSM::new(
@@ -539,51 +511,51 @@ mod tests {
         let callbacks = HashMap::from([
             (
                 Hook::BeforeEvent,
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(1, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
             (
                 Hook::AfterEvent,
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(5, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
             (
                 Hook::EnterState,
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(3, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
             (
                 Hook::LeaveState,
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(2, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
             (
                 Hook::Before(EventTag::Open),
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(0, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
             (
                 Hook::After(EventTag::Open),
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(4, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
         ]);
 
@@ -616,51 +588,51 @@ mod tests {
         let callbacks = HashMap::from([
             (
                 Hook::BeforeEvent,
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(0, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
             (
                 Hook::AfterEvent,
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(5, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
             (
                 Hook::EnterState,
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(4, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
             (
                 Hook::LeaveState,
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(2, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
             (
                 Hook::Leave(StateTag::Opened),
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(1, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
             (
                 Hook::Enter(StateTag::Closed),
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(3, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
         ]);
 
@@ -693,35 +665,35 @@ mod tests {
         let callbacks = HashMap::from([
             (
                 Hook::Before(EventTag::Open),
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(0, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
             (
                 Hook::Custom("opened"),
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(1, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
             (
                 Hook::Before(EventTag::Close),
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(2, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
             (
                 Hook::Custom("closed"),
-                Closure(Box::new(|_e| -> Result<(), MyError> {
+                Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(3, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
                     Ok(())
-                })),
+                }),
             ),
         ]);
 
