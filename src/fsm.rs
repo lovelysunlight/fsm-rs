@@ -4,7 +4,7 @@ use std::{collections::HashMap, fmt::Display, hash::Hash};
 pub trait EnumType: Display + Clone + Hash + PartialEq + Eq {}
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum Hook<T: EnumType, S: EnumType> {
+pub enum HookType<T: EnumType, S: EnumType> {
     Before(T),
     After(T),
     Leave(S),
@@ -92,7 +92,7 @@ where
     pub fn new<T, S>(
         initial: S,
         events: Vec<EventDesc<T, S>>,
-        callback_iter: HashMap<Hook<T, S>, F>,
+        hooks: impl IntoIterator<Item = (HookType<T, S>, F)>,
     ) -> Self
     where
         T: EnumType,
@@ -118,19 +118,19 @@ where
         }
 
         let mut callbacks: HashMap<CKey, F> = HashMap::new();
-        for (name, callback) in callback_iter {
+        for (name, callback) in hooks {
             let (target, callback_type) = match name {
-                Hook::BeforeEvent => ("".to_string(), CallbackType::BeforeEvent),
-                Hook::AfterEvent => ("".to_string(), CallbackType::AfterEvent),
-                Hook::Before(t) => (t.to_string(), CallbackType::BeforeEvent),
-                Hook::After(t) => (t.to_string(), CallbackType::AfterEvent),
+                HookType::BeforeEvent => ("".to_string(), CallbackType::BeforeEvent),
+                HookType::AfterEvent => ("".to_string(), CallbackType::AfterEvent),
+                HookType::Before(t) => (t.to_string(), CallbackType::BeforeEvent),
+                HookType::After(t) => (t.to_string(), CallbackType::AfterEvent),
 
-                Hook::LeaveState => ("".to_string(), CallbackType::LeaveState),
-                Hook::EnterState => ("".to_string(), CallbackType::EnterState),
-                Hook::Leave(t) => (t.to_string(), CallbackType::LeaveState),
-                Hook::Enter(t) => (t.to_string(), CallbackType::EnterState),
+                HookType::LeaveState => ("".to_string(), CallbackType::LeaveState),
+                HookType::EnterState => ("".to_string(), CallbackType::EnterState),
+                HookType::Leave(t) => (t.to_string(), CallbackType::LeaveState),
+                HookType::Enter(t) => (t.to_string(), CallbackType::EnterState),
 
-                Hook::Custom(t) => {
+                HookType::Custom(t) => {
                     let callback_type = if all_states.contains_key(t) {
                         CallbackType::EnterState
                     } else if all_events.contains_key(t) {
@@ -282,7 +282,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{EnumType, EventDesc, Hook, FSM};
+    use super::{EnumType, EventDesc, HookType, FSM};
     use crate::{action::Closure, error::FSMError, event::Event, Action};
     use std::{
         collections::HashMap,
@@ -388,19 +388,58 @@ mod tests {
             );
             assert_eq!("closed", fsm.get_current());
         }
+
+        {
+            let mut fsm: FSMWithVec = FSM::new(
+                StateTag::Closed,
+                vec![
+                    EventDesc {
+                        name: EventTag::Open,
+                        src: vec![StateTag::Closed],
+                        dst: StateTag::Opened,
+                    },
+                    EventDesc {
+                        name: EventTag::Close,
+                        src: vec![StateTag::Opened],
+                        dst: StateTag::Closed,
+                    },
+                ],
+                vec![
+                    (
+                        HookType::<EventTag, StateTag>::BeforeEvent,
+                        Closure::new(|_e| -> Result<(), MyError> { Ok(()) }),
+                    )
+                ],
+            );
+            assert_eq!("closed", fsm.get_current());
+
+            assert!(fsm.on_event("open", Some(&Vec::new())).is_ok());
+            assert_eq!("opened", fsm.get_current());
+
+            assert!(fsm.on_event("close", Some(&Vec::new())).is_ok());
+            assert_eq!("closed", fsm.get_current());
+
+            let ret = fsm.on_event("close", None);
+            assert!(ret.is_err());
+            assert_eq!(
+                ret.err().unwrap(),
+                FSMError::InvalidEvent("close".to_string(), "closed".to_string())
+            );
+            assert_eq!("closed", fsm.get_current());
+        }
     }
 
     #[test]
     fn test_fsm_before_event_fail() {
         let callbacks = HashMap::from([
             (
-                Hook::<EventTag, StateTag>::BeforeEvent,
+                HookType::<EventTag, StateTag>::BeforeEvent,
                 Closure::new(|_e| -> Result<(), MyError> {
                     Err(MyError::CustomeError("before event fail"))
                 }),
             ),
             (
-                Hook::<EventTag, StateTag>::AfterEvent,
+                HookType::<EventTag, StateTag>::AfterEvent,
                 Closure::new(|_e| -> Result<(), MyError> {
                     Err(MyError::CustomeError("after event fail"))
                 }),
@@ -436,7 +475,7 @@ mod tests {
     #[test]
     fn test_fsm_leave_state_fail() {
         let callbacks = HashMap::from([(
-            Hook::<EventTag, StateTag>::LeaveState,
+            HookType::<EventTag, StateTag>::LeaveState,
             Closure::new(|_e| -> Result<(), MyError> {
                 Err(MyError::CustomeError("leave state fail"))
             }),
@@ -472,13 +511,13 @@ mod tests {
     fn test_fsm_ignore_after_fail() {
         let callbacks = HashMap::from([
             (
-                Hook::<EventTag, StateTag>::AfterEvent,
+                HookType::<EventTag, StateTag>::AfterEvent,
                 Closure::new(|_e| -> Result<(), MyError> {
                     Err(MyError::CustomeError("after event fail"))
                 }),
             ),
             (
-                Hook::<EventTag, StateTag>::EnterState,
+                HookType::<EventTag, StateTag>::EnterState,
                 Closure::new(|_e| -> Result<(), MyError> {
                     Err(MyError::CustomeError("enter state fail"))
                 }),
@@ -510,7 +549,7 @@ mod tests {
         let counter = AtomicU32::new(0);
         let callbacks = HashMap::from([
             (
-                Hook::BeforeEvent,
+                HookType::BeforeEvent,
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(1, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -518,7 +557,7 @@ mod tests {
                 }),
             ),
             (
-                Hook::AfterEvent,
+                HookType::AfterEvent,
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(5, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -526,7 +565,7 @@ mod tests {
                 }),
             ),
             (
-                Hook::EnterState,
+                HookType::EnterState,
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(3, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -534,7 +573,7 @@ mod tests {
                 }),
             ),
             (
-                Hook::LeaveState,
+                HookType::LeaveState,
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(2, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -542,7 +581,7 @@ mod tests {
                 }),
             ),
             (
-                Hook::Before(EventTag::Open),
+                HookType::Before(EventTag::Open),
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(0, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -550,7 +589,7 @@ mod tests {
                 }),
             ),
             (
-                Hook::After(EventTag::Open),
+                HookType::After(EventTag::Open),
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(4, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -587,7 +626,7 @@ mod tests {
         let counter = AtomicU32::new(0);
         let callbacks = HashMap::from([
             (
-                Hook::BeforeEvent,
+                HookType::BeforeEvent,
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(0, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -595,7 +634,7 @@ mod tests {
                 }),
             ),
             (
-                Hook::AfterEvent,
+                HookType::AfterEvent,
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(5, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -603,7 +642,7 @@ mod tests {
                 }),
             ),
             (
-                Hook::EnterState,
+                HookType::EnterState,
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(4, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -611,7 +650,7 @@ mod tests {
                 }),
             ),
             (
-                Hook::LeaveState,
+                HookType::LeaveState,
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(2, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -619,7 +658,7 @@ mod tests {
                 }),
             ),
             (
-                Hook::Leave(StateTag::Opened),
+                HookType::Leave(StateTag::Opened),
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(1, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -627,7 +666,7 @@ mod tests {
                 }),
             ),
             (
-                Hook::Enter(StateTag::Closed),
+                HookType::Enter(StateTag::Closed),
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(3, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -664,7 +703,7 @@ mod tests {
         let counter = AtomicU32::new(0);
         let callbacks = HashMap::from([
             (
-                Hook::Before(EventTag::Open),
+                HookType::Before(EventTag::Open),
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(0, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -672,7 +711,7 @@ mod tests {
                 }),
             ),
             (
-                Hook::Custom("opened"),
+                HookType::Custom("opened"),
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(1, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -680,7 +719,7 @@ mod tests {
                 }),
             ),
             (
-                Hook::Before(EventTag::Close),
+                HookType::Before(EventTag::Close),
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(2, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -688,7 +727,7 @@ mod tests {
                 }),
             ),
             (
-                Hook::Custom("closed"),
+                HookType::Custom("closed"),
                 Closure::new(|_e| -> Result<(), MyError> {
                     assert_eq!(3, counter.load(Ordering::Relaxed));
                     counter.fetch_add(1, Ordering::Relaxed);
@@ -732,11 +771,11 @@ mod tests {
             }
         }
         let action = ActionHandler(AtomicU32::new(0));
-        let callbacks = HashMap::from([
-            (Hook::BeforeEvent, &action),
-            (Hook::AfterEvent, &action),
-            (Hook::LeaveState, &action),
-            (Hook::EnterState, &action),
+        let callbacks: HashMap<HookType<EventTag, StateTag>, &ActionHandler> = HashMap::from([
+            (HookType::BeforeEvent, &action),
+            (HookType::AfterEvent, &action),
+            (HookType::LeaveState, &action),
+            (HookType::EnterState, &action),
         ]);
         let mut fsm = FSM::new(
             StateTag::Closed,

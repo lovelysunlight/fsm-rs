@@ -1,4 +1,4 @@
-use fsm_rs::{Closure, EnumType, EventDesc, Hook, FSM};
+use fsm_rs::{Closure, EnumType, EventDesc, HookType, FSM};
 use std::collections::HashMap;
 use strum::Display;
 
@@ -19,11 +19,11 @@ fn main() {
         ],
         HashMap::from([
             (
-                Hook::BeforeEvent,
+                HookType::BeforeEvent,
                 Closure::new(|_e| -> Result<(), MyError> { Ok(()) }),
             ),
             (
-                Hook::AfterEvent,
+                HookType::AfterEvent,
                 Closure::new(|_e| -> Result<(), MyError> { Ok(()) }),
             ),
         ]),

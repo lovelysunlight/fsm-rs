@@ -5,7 +5,7 @@ mod fsm;
 
 pub use action::{Action, Closure};
 pub use error::FSMError;
-pub use {fsm::CallbackType, fsm::EnumType, fsm::EventDesc, fsm::Hook, fsm::FSM};
+pub use {fsm::CallbackType, fsm::EnumType, fsm::EventDesc, fsm::HookType, fsm::FSM};
 
 #[cfg(test)]
 mod tests {
