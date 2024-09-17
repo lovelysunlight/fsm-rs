@@ -3,8 +3,8 @@ mod error;
 mod event;
 mod fsm;
 
-pub use error::FSMError;
 pub use action::Action;
+pub use error::FSMError;
 pub use {fsm::CallbackType, fsm::EnumType, fsm::EventDesc, fsm::Hook, fsm::FSM};
 
 #[cfg(test)]
