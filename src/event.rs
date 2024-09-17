@@ -1,7 +1,5 @@
-use std::collections::HashMap;
-
 // Event is the info that get passed as a reference in the callbacks.
-pub struct Event<'a, K, V> {
+pub struct Event<'a, I> {
     // Event is the event name.
     pub event: &'a str,
 
@@ -12,5 +10,5 @@ pub struct Event<'a, K, V> {
     pub dst: &'a str,
 
     // Args is an optional list of arguments passed to the callback.
-    pub args: Option<&'a HashMap<K, V>>,
+    pub args: Option<&'a I>,
 }
