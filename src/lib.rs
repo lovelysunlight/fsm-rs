@@ -9,9 +9,10 @@ pub use {fsm::CallbackType, fsm::EnumType, fsm::EventDesc, fsm::HookType, fsm::F
 
 #[cfg(test)]
 mod tests {
+    use strum::AsRefStr;
     use strum::Display;
 
-    #[derive(Debug, PartialEq, Display)]
+    #[derive(Debug, Display, AsRefStr)]
     enum TestTag {
         #[strum(serialize = "Opened")]
         Opened,
@@ -23,5 +24,11 @@ mod tests {
     fn test_enum_display() {
         assert_eq!("Opened", TestTag::Opened.to_string());
         assert_eq!("Closed", TestTag::Closed.to_string());
+    }
+
+    #[test]
+    fn test_enum_as_ref() {
+        assert_eq!("Opened", TestTag::Opened.as_ref());
+        assert_eq!("Closed", TestTag::Closed.as_ref());
     }
 }

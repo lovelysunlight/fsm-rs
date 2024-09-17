@@ -1,5 +1,6 @@
 use fsm_rs::{Closure, EnumType, EventDesc, HookType, FSM};
 use std::collections::HashMap;
+use strum::AsRefStr;
 use strum::Display;
 
 fn main() {
@@ -44,7 +45,7 @@ fn main() {
     }
 }
 
-#[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Display, AsRefStr, Debug, Clone, Hash, PartialEq, Eq)]
 enum StateTag {
     #[strum(serialize = "opened")]
     Opened,
@@ -53,7 +54,7 @@ enum StateTag {
 }
 impl EnumType for StateTag {}
 
-#[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Display, AsRefStr, Debug, Clone, Hash, PartialEq, Eq)]
 enum EventTag {
     #[strum(serialize = "open")]
     Open,

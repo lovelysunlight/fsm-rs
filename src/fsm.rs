@@ -1,7 +1,7 @@
 use crate::{action::Action, error::FSMError, event::Event};
-use std::{collections::HashMap, fmt::Display, hash::Hash};
+use std::{borrow::Cow, collections::HashMap, fmt::Display, hash::Hash};
 
-pub trait EnumType: Display + Clone + Hash + PartialEq + Eq {}
+pub trait EnumType: AsRef<str> + Display + Clone + Hash + PartialEq + Eq {}
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum HookType<T: EnumType, S: EnumType> {
@@ -50,41 +50,41 @@ where
 
 // EKey is a struct key used for storing the transition map.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-struct EKey {
+struct EKey<'a> {
     // event is the name of the event that the keys refers to.
-    event: String,
+    event: Cow<'a, str>,
 
     // src is the source from where the event can transition.
-    src: String,
+    src: Cow<'a, str>,
 }
 
 // CKey is a struct key used for keeping the callbacks mapped to a target.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-struct CKey {
+struct CKey<'a> {
     // target is either the name of a state or an event depending on which
     // callback type the key refers to. It can also be "" for a non-targeted
     // callback like before_event.
-    target: String,
+    target: Cow<'a, str>,
 
     // callback_type is the situation when the callback will be run.
     callback_type: CallbackType,
 }
 
 #[derive(Debug, Clone)]
-pub struct FSM<I, F: Action<I>> {
+pub struct FSM<'a, I, F: Action<I>> {
     _marker: std::marker::PhantomData<I>,
 
     // current is the state that the FSM is currently in.
     current: String,
 
     // transitions maps events and source states to destination states.
-    transitions: HashMap<EKey, String>,
+    transitions: HashMap<EKey<'a>, String>,
 
     // callbacks maps events and targets to callback functions.
-    callbacks: HashMap<CKey, F>,
+    callbacks: HashMap<CKey<'a>, F>,
 }
 
-impl<I, F> FSM<I, F>
+impl<'a, I, F> FSM<'a, I, F>
 where
     I: IntoIterator,
     F: Action<I>,
@@ -107,8 +107,8 @@ where
             for src in e.src.iter() {
                 transitions.insert(
                     EKey {
-                        event: e.name.to_string(),
-                        src: src.to_string(),
+                        event: Cow::Owned(e.name.to_string()),
+                        src: Cow::Owned(src.to_string()),
                     },
                     e.dst.to_string(),
                 );
@@ -145,7 +145,7 @@ where
             if callback_type != CallbackType::None {
                 callbacks.insert(
                     CKey {
-                        target,
+                        target: Cow::Owned(target),
                         callback_type,
                     },
                     callback,
@@ -177,8 +177,8 @@ where
         let dst = self
             .transitions
             .get(&EKey {
-                event: event.to_string(),
-                src: self.current.clone(),
+                event: Cow::Borrowed(event.as_ref()),
+                src: Cow::Borrowed(&self.current),
             })
             .ok_or_else(|| {
                 let e = event.to_string();
@@ -190,11 +190,10 @@ where
                 FSMError::UnknownEvent(e)
             })?;
 
-        let src = &self.current.clone();
         let e = Event {
-            event: &event.to_string(),
-            src,
-            dst,
+            event: event.as_ref(),
+            src: &self.current.clone(),
+            dst: &dst.to_string(),
             args,
         };
 
@@ -227,13 +226,13 @@ where
     // can returns true if event can occur in the current state.
     pub fn can<T: EnumType>(&self, event: T) -> bool {
         self.transitions.contains_key(&EKey {
-            event: event.to_string(),
-            src: self.current.clone(),
+            event: Cow::Borrowed(event.as_ref()),
+            src: Cow::Borrowed(&self.current),
         })
     }
 }
 
-impl<I, F> FSM<I, F>
+impl<'a, I, F> FSM<'a, I, F>
 where
     I: IntoIterator,
     F: Action<I>,
@@ -241,13 +240,13 @@ where
     #[inline]
     fn before_event_callbacks(&self, e: &Event<I>) -> Result<(), F::Err> {
         if let Some(f) = self.callbacks.get(&CKey {
-            target: e.event.to_string(),
+            target: Cow::Borrowed(e.event),
             callback_type: CallbackType::BeforeEvent,
         }) {
             f.call(e)?;
         }
         if let Some(f) = self.callbacks.get(&CKey {
-            target: "".to_string(),
+            target: Cow::Borrowed(""),
             callback_type: CallbackType::BeforeEvent,
         }) {
             f.call(e)?;
@@ -258,13 +257,13 @@ where
     #[inline]
     fn after_event_callbacks(&self, e: &Event<I>) -> Result<(), F::Err> {
         if let Some(f) = self.callbacks.get(&CKey {
-            target: e.event.to_string(),
+            target: Cow::Borrowed(e.event),
             callback_type: CallbackType::AfterEvent,
         }) {
             f.call(e)?;
         }
         if let Some(f) = self.callbacks.get(&CKey {
-            target: "".to_string(),
+            target: Cow::Borrowed(""),
             callback_type: CallbackType::AfterEvent,
         }) {
             f.call(e)?;
@@ -275,13 +274,13 @@ where
     #[inline]
     fn enter_state_callbacks(&self, e: &Event<I>) -> Result<(), F::Err> {
         if let Some(f) = self.callbacks.get(&CKey {
-            target: self.current.clone(),
+            target: Cow::Borrowed(&self.current),
             callback_type: CallbackType::EnterState,
         }) {
             f.call(e)?;
         }
         if let Some(f) = self.callbacks.get(&CKey {
-            target: "".to_string(),
+            target: Cow::Borrowed(""),
             callback_type: CallbackType::EnterState,
         }) {
             f.call(e)?;
@@ -292,13 +291,13 @@ where
     #[inline]
     fn leave_state_callbacks(&self, e: &Event<I>) -> Result<(), F::Err> {
         if let Some(f) = self.callbacks.get(&CKey {
-            target: self.current.clone(),
+            target: Cow::Borrowed(&self.current),
             callback_type: CallbackType::LeaveState,
         }) {
             f.call(e)?;
         }
         if let Some(f) = self.callbacks.get(&CKey {
-            target: "".to_string(),
+            target: Cow::Borrowed(""),
             callback_type: CallbackType::LeaveState,
         }) {
             f.call(e)?;
@@ -315,6 +314,7 @@ mod tests {
         collections::HashMap,
         sync::atomic::{AtomicU32, Ordering},
     };
+    use strum::AsRefStr;
     use strum::Display;
     use thiserror::Error;
 
@@ -324,7 +324,7 @@ mod tests {
         CustomeError(&'static str),
     }
 
-    #[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
+    #[derive(Display, AsRefStr, Debug, Clone, Hash, PartialEq, Eq)]
     enum StateTag {
         #[strum(serialize = "opened")]
         Opened,
@@ -333,7 +333,7 @@ mod tests {
     }
     impl EnumType for StateTag {}
 
-    #[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
+    #[derive(Display, AsRefStr, Debug, Clone, Hash, PartialEq, Eq)]
     enum EventTag {
         #[strum(serialize = "open")]
         Open,
@@ -342,8 +342,8 @@ mod tests {
     }
     impl EnumType for EventTag {}
 
-    type FSMWithHashMap<'a> = FSM<HashMap<u32, u32>, Closure<'a, HashMap<u32, u32>, MyError>>;
-    type FSMWithVec<'a> = FSM<Vec<u32>, Closure<'a, Vec<u32>, MyError>>;
+    type FSMWithHashMap<'a> = FSM<'a, HashMap<u32, u32>, Closure<'a, HashMap<u32, u32>, MyError>>;
+    type FSMWithVec<'a> = FSM<'a, Vec<u32>, Closure<'a, Vec<u32>, MyError>>;
 
     #[test]
     fn test_fsm_state() {
