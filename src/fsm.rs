@@ -3,8 +3,6 @@ use std::{collections::HashMap, fmt::Display, hash::Hash};
 
 pub trait EnumType: Display + Clone + Hash + PartialEq + Eq {}
 
-impl EnumType for &'static str {}
-
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum HookType<T: EnumType, S: EnumType> {
     Before(T),
