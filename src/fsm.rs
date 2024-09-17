@@ -3,6 +3,8 @@ use std::{collections::HashMap, fmt::Display, hash::Hash};
 
 pub trait EnumType: Display + Clone + Hash + PartialEq + Eq {}
 
+impl EnumType for &'static str {}
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum HookType<T: EnumType, S: EnumType> {
     Before(T),
@@ -160,29 +162,39 @@ where
         }
     }
 
+    // get_current returns the current state of the FSM.
     pub fn get_current(&self) -> &str {
-        self.current.as_str()
+        &self.current
     }
 
-    pub fn on_event(&mut self, event: &str, args: Option<&I>) -> Result<(), FSMError<String>> {
+    // on_event initiates a state transition with the named event.
+    //
+    // The call takes a variable number of arguments that will be passed to the
+    // callback, if defined.
+    pub fn on_event<T: EnumType>(
+        &mut self,
+        event: T,
+        args: Option<&I>,
+    ) -> Result<(), FSMError<String>> {
         let dst = self
             .transitions
             .get(&EKey {
                 event: event.to_string(),
-                src: self.current.to_string(),
+                src: self.current.clone(),
             })
             .ok_or_else(|| {
+                let e = event.to_string();
                 for ekey in self.transitions.keys() {
-                    if ekey.event.eq(&event) {
-                        return FSMError::InvalidEvent(event.to_string(), self.current.to_string());
+                    if ekey.event.eq(&e) {
+                        return FSMError::InvalidEvent(e, self.current.clone());
                     }
                 }
-                FSMError::UnknownEvent(event.to_string())
+                FSMError::UnknownEvent(e)
             })?;
 
         let src = &self.current.clone();
         let e = Event {
-            event,
+            event: &event.to_string(),
             src,
             dst,
             args,
@@ -208,6 +220,19 @@ where
 
         Ok(())
     }
+
+    // is returns true if state is the current state.
+    pub fn is<S: EnumType>(&self, state: S) -> bool {
+        self.current.eq(&state.to_string())
+    }
+
+    // can returns true if event can occur in the current state.
+    pub fn can<T: EnumType>(&self, event: T) -> bool {
+        self.transitions.contains_key(&EKey {
+            event: event.to_string(),
+            src: self.current.clone(),
+        })
+    }
 }
 
 impl<I, F> FSM<I, F>
@@ -215,6 +240,7 @@ where
     I: IntoIterator,
     F: Action<I>,
 {
+    #[inline]
     fn before_event_callbacks(&self, e: &Event<I>) -> Result<(), F::Err> {
         if let Some(f) = self.callbacks.get(&CKey {
             target: e.event.to_string(),
@@ -231,6 +257,7 @@ where
         Ok(())
     }
 
+    #[inline]
     fn after_event_callbacks(&self, e: &Event<I>) -> Result<(), F::Err> {
         if let Some(f) = self.callbacks.get(&CKey {
             target: e.event.to_string(),
@@ -247,6 +274,7 @@ where
         Ok(())
     }
 
+    #[inline]
     fn enter_state_callbacks(&self, e: &Event<I>) -> Result<(), F::Err> {
         if let Some(f) = self.callbacks.get(&CKey {
             target: self.current.clone(),
@@ -263,6 +291,7 @@ where
         Ok(())
     }
 
+    #[inline]
     fn leave_state_callbacks(&self, e: &Event<I>) -> Result<(), F::Err> {
         if let Some(f) = self.callbacks.get(&CKey {
             target: self.current.clone(),
@@ -304,7 +333,6 @@ mod tests {
         #[strum(serialize = "closed")]
         Closed,
     }
-
     impl EnumType for StateTag {}
 
     #[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
@@ -340,13 +368,13 @@ mod tests {
             );
             assert_eq!("closed", fsm.get_current());
 
-            assert!(fsm.on_event("open", Some(&HashMap::new())).is_ok());
+            assert!(fsm.on_event(EventTag::Open, Some(&HashMap::new())).is_ok());
             assert_eq!("opened", fsm.get_current());
 
-            assert!(fsm.on_event("close", Some(&HashMap::new())).is_ok());
+            assert!(fsm.on_event(EventTag::Close, Some(&HashMap::new())).is_ok());
             assert_eq!("closed", fsm.get_current());
 
-            let ret = fsm.on_event("close", None);
+            let ret = fsm.on_event(EventTag::Close, None);
             assert!(ret.is_err());
             assert_eq!(
                 ret.err().unwrap(),
@@ -374,13 +402,13 @@ mod tests {
             );
             assert_eq!("closed", fsm.get_current());
 
-            assert!(fsm.on_event("open", Some(&Vec::new())).is_ok());
+            assert!(fsm.on_event(EventTag::Open, Some(&Vec::new())).is_ok());
             assert_eq!("opened", fsm.get_current());
 
-            assert!(fsm.on_event("close", Some(&Vec::new())).is_ok());
+            assert!(fsm.on_event(EventTag::Close, Some(&Vec::new())).is_ok());
             assert_eq!("closed", fsm.get_current());
 
-            let ret = fsm.on_event("close", None);
+            let ret = fsm.on_event(EventTag::Close, None);
             assert!(ret.is_err());
             assert_eq!(
                 ret.err().unwrap(),
@@ -404,22 +432,20 @@ mod tests {
                         dst: StateTag::Closed,
                     },
                 ],
-                vec![
-                    (
-                        HookType::<EventTag, StateTag>::BeforeEvent,
-                        Closure::new(|_e| -> Result<(), MyError> { Ok(()) }),
-                    )
-                ],
+                vec![(
+                    HookType::<EventTag, StateTag>::BeforeEvent,
+                    Closure::new(|_e| -> Result<(), MyError> { Ok(()) }),
+                )],
             );
             assert_eq!("closed", fsm.get_current());
 
-            assert!(fsm.on_event("open", Some(&Vec::new())).is_ok());
+            assert!(fsm.on_event(EventTag::Open, Some(&Vec::new())).is_ok());
             assert_eq!("opened", fsm.get_current());
 
-            assert!(fsm.on_event("close", Some(&Vec::new())).is_ok());
+            assert!(fsm.on_event(EventTag::Close, Some(&Vec::new())).is_ok());
             assert_eq!("closed", fsm.get_current());
 
-            let ret = fsm.on_event("close", None);
+            let ret = fsm.on_event(EventTag::Close, None);
             assert!(ret.is_err());
             assert_eq!(
                 ret.err().unwrap(),
@@ -463,7 +489,7 @@ mod tests {
         );
         assert_eq!("closed", fsm.get_current());
 
-        let ret = fsm.on_event("open", None);
+        let ret = fsm.on_event(EventTag::Open, None);
         assert!(ret.is_err());
         assert_eq!(
             ret.err().unwrap(),
@@ -498,7 +524,7 @@ mod tests {
         );
         assert_eq!("closed", fsm.get_current());
 
-        let ret = fsm.on_event("open", None);
+        let ret = fsm.on_event(EventTag::Open, None);
         assert!(ret.is_err());
         assert_eq!(
             ret.err().unwrap(),
@@ -540,7 +566,7 @@ mod tests {
             callbacks,
         );
         assert_eq!("closed", fsm.get_current());
-        assert!(fsm.on_event("open", None).is_ok());
+        assert!(fsm.on_event(EventTag::Open, None).is_ok());
         assert_eq!("opened", fsm.get_current());
     }
 
@@ -617,7 +643,7 @@ mod tests {
 
         assert_eq!("closed", fsm.get_current());
         let hashmap = HashMap::from([(1, 11), (2, 22)]);
-        let _ = fsm.on_event("open", Some(&hashmap));
+        let _ = fsm.on_event(EventTag::Open, Some(&hashmap));
         assert_eq!("opened", fsm.get_current());
     }
 
@@ -694,7 +720,7 @@ mod tests {
 
         assert_eq!("opened", fsm.get_current());
         let hashmap = HashMap::from([(1, 11), (2, 22)]);
-        let _ = fsm.on_event("close", Some(&hashmap));
+        let _ = fsm.on_event(EventTag::Close, Some(&hashmap));
         assert_eq!("closed", fsm.get_current());
     }
 
@@ -755,7 +781,7 @@ mod tests {
         dbg!("{:?}", &fsm);
         assert_eq!("closed", fsm.get_current());
         let hashmap = HashMap::from([(1, 11), (2, 22)]);
-        let _ = fsm.on_event("open", Some(&hashmap));
+        let _ = fsm.on_event(EventTag::Open, Some(&hashmap));
         assert_eq!("opened", fsm.get_current());
     }
 
@@ -793,7 +819,7 @@ mod tests {
             ],
             callbacks,
         );
-        let _ = fsm.on_event("open", None::<&HashMap<u32, u32>>);
+        let _ = fsm.on_event(EventTag::Open, None::<&HashMap<u32, u32>>);
         assert_eq!(4, action.0.load(Ordering::Relaxed));
     }
 }

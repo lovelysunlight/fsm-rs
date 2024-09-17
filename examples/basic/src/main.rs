@@ -30,16 +30,18 @@ fn main() {
     );
     println!("{}", fsm.get_current());
 
-    assert!(fsm.on_event("open", None).is_ok());
+    assert!(fsm.on_event(EventTag::Open, None).is_ok());
     println!("{}", fsm.get_current());
 
-    assert!(fsm.on_event("close", None).is_ok());
+    assert!(fsm.on_event(EventTag::Close, None).is_ok());
     println!("{}", fsm.get_current());
 
-    let ret = fsm.on_event("close", None);
-    assert!(ret.is_err());
-    println!("{:?}", ret.err().unwrap());
-    println!("{}", fsm.get_current());
+    {
+        let ret = fsm.on_event(EventTag::Close, None);
+        assert!(ret.is_err());
+        println!("{:?}", ret.err().unwrap());
+        println!("{}", fsm.get_current());
+    }
 }
 
 #[derive(Display, Debug, Clone, Hash, PartialEq, Eq)]
