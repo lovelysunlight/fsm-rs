@@ -1,10 +1,12 @@
 use crate::{action::Action, error::FSMError, event::Event};
 use std::{borrow::Cow, collections::HashMap, fmt::Display, hash::Hash};
 
-pub trait EnumType: AsRef<str> + Display + Clone + Hash + PartialEq + Eq {}
+pub trait FSMState: AsRef<str> + Display + Clone + Hash + PartialEq + Eq {}
+
+pub trait FSMEvent: AsRef<str> + Display + Clone + Hash + PartialEq + Eq {}
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum HookType<T: EnumType, S: EnumType> {
+pub enum HookType<T: FSMEvent, S: FSMState> {
     Before(T),
     After(T),
     Leave(S),
@@ -33,8 +35,8 @@ pub enum CallbackType {
 // the specified destination state, calling all defined callbacks as it goes.
 pub struct EventDesc<T, S>
 where
-    T: EnumType,
-    S: EnumType,
+    T: FSMEvent,
+    S: FSMState,
 {
     // Name is the event name used when calling for a transition.
     pub name: T,
@@ -95,8 +97,8 @@ where
         hooks: impl IntoIterator<Item = (HookType<T, S>, F)>,
     ) -> Self
     where
-        T: EnumType,
-        S: EnumType,
+        T: FSMEvent,
+        S: FSMState,
     {
         let mut all_events = HashMap::new();
         let mut all_states = HashMap::new();
@@ -169,7 +171,7 @@ where
     //
     // The call takes a variable number of arguments that will be passed to the
     // callback, if defined.
-    pub fn on_event<T: EnumType>(
+    pub fn on_event<T: FSMEvent>(
         &mut self,
         event: T,
         args: Option<&I>,
@@ -219,12 +221,12 @@ where
     }
 
     // is returns true if state is the current state.
-    pub fn is<S: EnumType>(&self, state: S) -> bool {
+    pub fn is<S: FSMState>(&self, state: S) -> bool {
         self.current.eq(state.as_ref())
     }
 
     // can returns true if event can occur in the current state.
-    pub fn can<T: EnumType>(&self, event: T) -> bool {
+    pub fn can<T: FSMEvent>(&self, event: T) -> bool {
         self.transitions.contains_key(&EKey {
             event: Cow::Borrowed(event.as_ref()),
             src: Cow::Borrowed(&self.current),
@@ -308,7 +310,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{EnumType, EventDesc, HookType, FSM};
+    use super::{EventDesc, FSMEvent, FSMState, HookType, FSM};
     use crate::{action::Closure, error::FSMError, event::Event, Action};
     use std::{
         collections::HashMap,
@@ -331,7 +333,7 @@ mod tests {
         #[strum(serialize = "closed")]
         Closed,
     }
-    impl EnumType for StateTag {}
+    impl FSMState for StateTag {}
 
     #[derive(Display, AsRefStr, Debug, Clone, Hash, PartialEq, Eq)]
     enum EventTag {
@@ -340,7 +342,7 @@ mod tests {
         #[strum(serialize = "close")]
         Close,
     }
-    impl EnumType for EventTag {}
+    impl FSMEvent for EventTag {}
 
     type FSMWithHashMap<'a> = FSM<'a, HashMap<u32, u32>, Closure<'a, HashMap<u32, u32>, MyError>>;
     type FSMWithVec<'a> = FSM<'a, Vec<u32>, Closure<'a, Vec<u32>, MyError>>;
@@ -778,11 +780,7 @@ mod tests {
                 dst: StateTag::Closed,
             },
         ];
-        let mut fsm = FSM::new(
-            StateTag::Closed,
-            events,
-            callbacks,
-        );
+        let mut fsm = FSM::new(StateTag::Closed, events, callbacks);
         dbg!("{:?}", &fsm);
         assert_eq!("closed", fsm.get_current());
         let hashmap = HashMap::from([(1, 11), (2, 22)]);
