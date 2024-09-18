@@ -105,11 +105,9 @@ mod error;
 mod event;
 mod fsm;
 
+pub use self::fsm::{CallbackType, EventDesc, FSMEvent, FSMState, HookType, FSM};
 pub use action::{Action, Closure};
 pub use error::FSMError;
-pub use {
-    fsm::CallbackType, fsm::EventDesc, fsm::FSMEvent, fsm::FSMState, fsm::HookType, fsm::FSM,
-};
 
 #[cfg(test)]
 mod tests {

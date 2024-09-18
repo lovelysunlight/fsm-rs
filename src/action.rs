@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use std::rc::Rc as Shared;
 
 /// Action is the trait for callbacks.
-pub trait Action<I>: Debug + Clone {
+pub trait Action<I>: Debug {
     type Err: std::error::Error;
     fn call(&self, e: &Event<I>) -> Result<(), Self::Err>;
 }

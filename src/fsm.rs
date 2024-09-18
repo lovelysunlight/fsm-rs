@@ -2,10 +2,10 @@ use crate::{action::Action, error::FSMError, event::Event};
 use std::{borrow::Cow, collections::HashMap, fmt::Display, hash::Hash};
 
 /// FSMState represents the state of the FSM.
-pub trait FSMState: AsRef<str> + Display + Clone + Hash + PartialEq + Eq {}
+pub trait FSMState: AsRef<str> + Display {}
 
 /// FSMEvent represents the event of the FSM.
-pub trait FSMEvent: AsRef<str> + Display + Clone + Hash + PartialEq + Eq {}
+pub trait FSMEvent: AsRef<str> + Display {}
 
 /// HookType represents the type of event.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -37,20 +37,21 @@ pub enum CallbackType {
 // The event can have one or more source states that is valid for performing
 // the transition. If the FSM is in one of the source states it will end up in
 // the specified destination state, calling all defined callbacks as it goes.
+#[derive(Debug)]
 pub struct EventDesc<T, S>
 where
     T: FSMEvent,
     S: FSMState,
 {
-    // Name is the event name used when calling for a transition.
+    /// `name` is the event name used when calling for a transition.
     pub name: T,
 
-    // Src is a slice of source states that the FSM must be in to perform a
-    // state transition.
+    /// `src` is a slice of source states that the FSM must be in to perform a
+    /// state transition.
     pub src: Vec<S>,
 
-    // Dst is the destination state that the FSM will be in if the transition
-    // succeeds.
+    /// `dst` is the destination state that the FSM will be in if the transition
+    /// succeeds.
     pub dst: S,
 }
 
