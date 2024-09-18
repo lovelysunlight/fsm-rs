@@ -1,5 +1,5 @@
 use crate::{action::Action, error::FSMError, event::Event};
-use std::{borrow::Cow, collections::HashMap, fmt::Display, hash::Hash};
+use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
 /// FSMState represents the state of the FSM.
 pub trait FSMState: AsRef<Self> + AsRef<str> + Display + Clone + Eq + PartialEq {}
@@ -322,7 +322,12 @@ mod tests {
     use crate::{action::Closure, error::FSMError, event::Event, Action};
     use std::{
         collections::HashMap,
-        sync::atomic::{AtomicU32, Ordering},
+        fmt::{Debug, Display},
+        sync::{
+            atomic::{AtomicU32, Ordering},
+            Arc, Mutex,
+        },
+        thread,
     };
     use strum::AsRefStr;
     use strum::Display;
@@ -804,17 +809,36 @@ mod tests {
         assert_eq!(StateTag::Opened, fsm.get_current());
     }
 
+    #[derive(Debug)]
+    struct ActionHandler(AtomicU32);
+    impl<S, I> Action<S, I> for &ActionHandler {
+        type Err = MyError;
+        fn call(&self, _e: &Event<S, I>) -> Result<(), Self::Err> {
+            self.0.fetch_add(1, Ordering::Relaxed);
+            Ok(())
+        }
+    }
+    #[derive(Clone, Debug)]
+    struct NoopHandler;
+    impl<S, I> Action<S, I> for NoopHandler
+    where
+        S: Display,
+        I: IntoIterator<Item = u32> + Clone,
+    {
+        type Err = MyError;
+        fn call(&self, e: &Event<S, I>) -> Result<(), Self::Err> {
+            let args: Vec<<I as IntoIterator>::Item> =
+                e.args.unwrap().clone().into_iter().collect();
+            println!(
+                "{:?} - event:{}, src:{}, dst:{}",
+                args, e.event, e.src, e.dst,
+            );
+            Ok(())
+        }
+    }
+
     #[test]
     fn test_struct_action() {
-        #[derive(Debug)]
-        struct ActionHandler(AtomicU32);
-        impl<S, I> Action<S, I> for &ActionHandler {
-            type Err = MyError;
-            fn call(&self, _e: &Event<S, I>) -> Result<(), Self::Err> {
-                self.0.fetch_add(1, Ordering::Relaxed);
-                Ok(())
-            }
-        }
         let action = ActionHandler(AtomicU32::new(0));
         let callbacks: HashMap<HookType<EventTag, StateTag>, &ActionHandler> = HashMap::from([
             (HookType::BeforeEvent, &action),
@@ -840,5 +864,54 @@ mod tests {
         );
         let _ = fsm.on_event("open", None::<&HashMap<u32, u32>>);
         assert_eq!(4, action.0.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn test_multi_thread() {
+        let action = NoopHandler {};
+        // let action = Closure::new(|_e| -> Result<(), MyError> { Ok(()) });
+        let callbacks: HashMap<HookType<EventTag, StateTag>, _> =
+            HashMap::from([(HookType::BeforeEvent, action.clone())]);
+        let fsm = Arc::new(Mutex::new(FSM::new(
+            StateTag::Closed,
+            vec![
+                EventDesc {
+                    name: EventTag::Open,
+                    src: vec![StateTag::Closed],
+                    dst: StateTag::Opened,
+                },
+                EventDesc {
+                    name: EventTag::Close,
+                    src: vec![StateTag::Opened],
+                    dst: StateTag::Closed,
+                },
+            ],
+            callbacks,
+        )));
+
+        let thread_num = 10;
+        let mut handlers = Vec::new();
+        for i in 0..thread_num {
+            let fsm_clone = fsm.clone();
+            handlers.push(thread::spawn(move || {
+                let mut guard = fsm_clone.lock().unwrap();
+                if guard.can(EventTag::Open) {
+                    guard.on_event(EventTag::Open, Some(&vec![i]))
+                } else {
+                    guard.on_event(EventTag::Close, Some(&vec![i]))
+                }
+            }));
+        }
+
+        let res: Vec<_> = handlers
+            .into_iter()
+            .map(|handler| handler.join().unwrap())
+            .map(|res| match res {
+                Ok(_) => "ok".to_string(),
+                Err(err) => err.to_string(),
+            })
+            .collect();
+
+        assert_eq!((0..thread_num).map(|_| "ok").collect::<Vec<_>>(), res);
     }
 }

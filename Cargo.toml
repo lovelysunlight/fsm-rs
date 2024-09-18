@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 authors = ["JimChen <imjimchen@163.com>"]
 license = "MIT"
-organization = "lovelysunlight"
 
 description = "Finite State Machine for Rust"
 keywords = ["finite-state-machine", "fsm", "state-machine", "state", "machine"]

@@ -11,6 +11,7 @@ pub trait Action<S, I>: Debug {
 type WrapFn<'a, S, I, E> = Shared<dyn Fn(&Event<S, I>) -> Result<(), E> + 'a>;
 
 /// Closure is a wrapper around a closure that implements the Action trait.
+/// unsupport thread-safe
 pub struct Closure<'a, S, I, E>(pub(crate) WrapFn<'a, S, I, E>);
 
 impl<'a, S, I, E> Closure<'a, S, I, E> {
