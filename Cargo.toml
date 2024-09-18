@@ -9,7 +9,7 @@ organization = "lovelysunlight"
 description = "Finite State Machine for Rust"
 keywords = ["finite-state-machine", "fsm", "state-machine", "state", "machine"]
 
-# documentation = "https://docs.rs/fsm"
+documentation = "https://docs.rs/scc"
 homepage = "https://github.com/lovelysunlight/fsm-rs"
 repository = "https://github.com/lovelysunlight/fsm-rs"
 readme = "./README.md"
