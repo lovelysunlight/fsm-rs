@@ -1,6 +1,8 @@
 # FSM for Rust
 
 [![Build Status](https://github.com/lovelysunlight/fsm-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/lovelysunlight/fsm-rs/actions/workflows/ci.yml)
+[![Latest Version](https://img.shields.io/crates/v/small-fsm.svg)](https://crates.io/crates/small-fsm)
+[![Rust Documentation](https://docs.rs/small-fsm/badge.svg)](https://docs.rs/small-fsm)
 [![License Badge](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/lovelysunlight/fsm-rs/main/LICENSE)
 
 Finite State Machine for Rust.
