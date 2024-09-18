@@ -19,13 +19,14 @@ small-fsm = "0.1"
 
 From examples/basic:
 ```rust
-use small_fsm::{Closure, EventDesc, FSMEvent, FSMState, HookType, FSM};
+#[doc(hidden)]
+use small_fsm::{Closure, EventDesc, FSMState, HookType, FSM};
 use std::collections::HashMap;
 use strum::AsRefStr;
 use strum::Display;
 
 fn main() {
-    let mut fsm: FSM<Vec<u32>, _> = FSM::new(
+    let mut fsm: FSM<_, Vec<u32>, _> = FSM::new(
         StateTag::Closed,
         vec![
             EventDesc {
@@ -82,7 +83,6 @@ enum EventTag {
     #[strum(serialize = "close")]
     Close,
 }
-impl FSMEvent for EventTag {}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum MyError {

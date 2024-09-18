@@ -22,7 +22,7 @@
 //! # Example
 //!
 //! ```rust
-//! use small_fsm::{Closure, EventDesc, FSMEvent, FSMState, HookType, FSM};
+//! use small_fsm::{Closure, EventDesc, FSMState, HookType, FSM};
 //! use std::collections::HashMap;
 //! use strum::AsRefStr;
 //! use strum::Display;
@@ -35,15 +35,11 @@
 //!     Closed,
 //! }
 //! impl FSMState for StateTag {}
-//!
-//! #[derive(Display, AsRefStr, Debug, Clone, Hash, PartialEq, Eq)]
-//! enum EventTag {
-//!     #[strum(serialize = "open")]
-//!     Open,
-//!     #[strum(serialize = "close")]
-//!     Close,
+//! impl AsRef<Self> for StateTag {
+//!     fn as_ref(&self) -> &Self {
+//!         &self
+//!     }
 //! }
-//! impl FSMEvent for EventTag {}
 //!
 //! #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 //! pub enum MyError {
@@ -66,16 +62,16 @@
 //!     }
 //! }
 //!
-//! let mut fsm: FSM<Vec<u32>, _> = FSM::new(
+//! let mut fsm: FSM<_, Vec<u32>, _> = FSM::new(
 //!     StateTag::Closed,
 //!     vec![
 //!         EventDesc {
-//!             name: EventTag::Open,
+//!             name: "open",
 //!             src: vec![StateTag::Closed],
 //!             dst: StateTag::Opened,
 //!         },
 //!         EventDesc {
-//!             name: EventTag::Close,
+//!             name: "close",
 //!             src: vec![StateTag::Opened],
 //!             dst: StateTag::Closed,
 //!         },
@@ -92,13 +88,13 @@
 //!     ]),
 //! );
 //!
-//! assert_eq!("closed", fsm.get_current());
+//! assert_eq!(StateTag::Closed, fsm.get_current());
 //!
-//! assert!(fsm.on_event(EventTag::Open, None).is_ok());
-//! assert_eq!("opened", fsm.get_current());
+//! assert!(fsm.on_event("open", None).is_ok());
+//! assert_eq!(StateTag::Opened, fsm.get_current());
 //!
-//! assert!(fsm.on_event(EventTag::Close, None).is_ok());
-//! assert_eq!("closed", fsm.get_current());
+//! assert!(fsm.on_event("close", None).is_ok());
+//! assert_eq!(StateTag::Closed, fsm.get_current());
 //! ```
 //!
 
@@ -107,7 +103,7 @@ mod error;
 mod event;
 mod fsm;
 
-pub use self::fsm::{CallbackType, EventDesc, FSMEvent, FSMState, HookType, FSM};
+pub use self::fsm::{CallbackType, EventDesc, FSMState, HookType, FSM};
 pub use action::{Action, Closure};
 pub use error::FSMError;
 
