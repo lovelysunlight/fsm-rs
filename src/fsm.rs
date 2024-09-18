@@ -28,7 +28,7 @@ pub enum CallbackType {
     AfterEvent,
 }
 
-// EventDesc represents an event when initializing the FSM.
+/// EventDesc represents an event when initializing the FSM.
 //
 // The event can have one or more source states that is valid for performing
 // the transition. If the FSM is in one of the source states it will end up in
@@ -50,7 +50,7 @@ where
     pub dst: S,
 }
 
-// EKey is a struct key used for storing the transition map.
+/// EKey is a struct key used for storing the transition map.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 struct EKey<'a> {
     // event is the name of the event that the keys refers to.
@@ -60,7 +60,7 @@ struct EKey<'a> {
     src: Cow<'a, str>,
 }
 
-// CKey is a struct key used for keeping the callbacks mapped to a target.
+/// CKey is a struct key used for keeping the callbacks mapped to a target.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 struct CKey<'a> {
     // target is either the name of a state or an event depending on which
@@ -162,12 +162,12 @@ where
         }
     }
 
-    // get_current returns the current state of the FSM.
+    /// get_current returns the current state of the FSM.
     pub fn get_current(&self) -> &str {
         &self.current
     }
 
-    // on_event initiates a state transition with the named event.
+    /// on_event initiates a state transition with the named event.
     //
     // The call takes a variable number of arguments that will be passed to the
     // callback, if defined.
@@ -220,12 +220,12 @@ where
         Ok(())
     }
 
-    // is returns true if state is the current state.
+    /// is returns true if state is the current state.
     pub fn is<S: FSMState>(&self, state: S) -> bool {
         self.current.eq(state.as_ref())
     }
 
-    // can returns true if event can occur in the current state.
+    /// can returns true if event can occur in the current state.
     pub fn can<T: FSMEvent>(&self, event: T) -> bool {
         self.transitions.contains_key(&EKey {
             event: Cow::Borrowed(event.as_ref()),

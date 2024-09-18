@@ -1,12 +1,13 @@
 use crate::event::Event;
-use std::{fmt::Debug, rc::Rc};
+use std::fmt::Debug;
+use std::rc::Rc as Shared;
 
 pub trait Action<I>: Debug + Clone {
     type Err: std::error::Error;
     fn call(&self, e: &Event<I>) -> Result<(), Self::Err>;
 }
 
-type WrapFn<'a, I, E> = Rc<dyn Fn(&Event<I>) -> Result<(), E> + 'a>;
+type WrapFn<'a, I, E> = Shared<dyn Fn(&Event<I>) -> Result<(), E> + 'a>;
 
 pub struct Closure<'a, I, E>(pub(crate) WrapFn<'a, I, E>);
 
@@ -15,7 +16,7 @@ impl<'a, I, E> Closure<'a, I, E> {
     where
         F: Fn(&Event<I>) -> Result<(), E> + 'a,
     {
-        Self(Rc::new(f))
+        Self(Shared::new(f))
     }
 }
 

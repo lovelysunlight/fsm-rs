@@ -1,4 +1,4 @@
-// Event is the info that get passed as a reference in the callbacks.
+/// Event is the info that get passed as a reference in the callbacks.
 pub struct Event<'a, I> {
     // Event is the event name.
     pub event: &'a str,
