@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use thiserror::Error;
 
+/// FSMError is the error type for the FSM.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum FSMError<S: Display> {
     #[error("no transition with error: {0}")]

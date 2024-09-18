@@ -1,10 +1,13 @@
 use crate::{action::Action, error::FSMError, event::Event};
 use std::{borrow::Cow, collections::HashMap, fmt::Display, hash::Hash};
 
+/// FSMState represents the state of the FSM.
 pub trait FSMState: AsRef<str> + Display + Clone + Hash + PartialEq + Eq {}
 
+/// FSMEvent represents the event of the FSM.
 pub trait FSMEvent: AsRef<str> + Display + Clone + Hash + PartialEq + Eq {}
 
+/// HookType represents the type of event.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum HookType<T: FSMEvent, S: FSMState> {
     Before(T),
@@ -19,6 +22,7 @@ pub enum HookType<T: FSMEvent, S: FSMState> {
     EnterState,
 }
 
+/// CallbackType represents the type of callback.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum CallbackType {
     None,
@@ -72,6 +76,10 @@ struct CKey<'a> {
     callback_type: CallbackType,
 }
 
+/// FSM represents a finite state machine.
+///
+/// The FSM is initialized with an initial state and a list of events.
+///
 #[derive(Debug, Clone)]
 pub struct FSM<'a, I, F: Action<I>> {
     _marker: std::marker::PhantomData<I>,
@@ -91,6 +99,7 @@ where
     I: IntoIterator,
     F: Action<I>,
 {
+    /// new creates a new FSM.
     pub fn new<T, S>(
         initial: S,
         events: impl IntoIterator<Item = EventDesc<T, S>>,

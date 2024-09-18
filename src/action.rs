@@ -2,6 +2,7 @@ use crate::event::Event;
 use std::fmt::Debug;
 use std::rc::Rc as Shared;
 
+/// Action is the trait for callbacks.
 pub trait Action<I>: Debug + Clone {
     type Err: std::error::Error;
     fn call(&self, e: &Event<I>) -> Result<(), Self::Err>;
@@ -9,6 +10,7 @@ pub trait Action<I>: Debug + Clone {
 
 type WrapFn<'a, I, E> = Shared<dyn Fn(&Event<I>) -> Result<(), E> + 'a>;
 
+/// Closure is a wrapper around a closure that implements the Action trait.
 pub struct Closure<'a, I, E>(pub(crate) WrapFn<'a, I, E>);
 
 impl<'a, I, E> Closure<'a, I, E> {
