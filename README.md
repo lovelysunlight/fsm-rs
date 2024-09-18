@@ -9,7 +9,7 @@ Finite State Machine for Rust.
 
 ```toml
 [dependencies]
-scc = "0.1"
+small-fsm = "0.1"
 
 # optional, you can also use `strum` to work with enums and strings easier in Rust.
 # strum = { version = "0.26", features = ["derive"] }
@@ -19,7 +19,7 @@ scc = "0.1"
 
 From examples/basic:
 ```rust
-use scc::{Closure, EventDesc, FSMEvent, FSMState, HookType, FSM};
+use small_fsm::{Closure, EventDesc, FSMEvent, FSMState, HookType, FSM};
 use std::collections::HashMap;
 use strum::AsRefStr;
 use strum::Display;

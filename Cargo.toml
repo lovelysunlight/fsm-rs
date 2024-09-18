@@ -1,5 +1,5 @@
 [package]
-name = "scc"
+name = "small-fsm"
 version = "0.1.0"
 edition = "2021"
 authors = ["JimChen <imjimchen@163.com>"]
@@ -9,7 +9,7 @@ organization = "lovelysunlight"
 description = "Finite State Machine for Rust"
 keywords = ["finite-state-machine", "fsm", "state-machine", "state", "machine"]
 
-documentation = "https://docs.rs/scc"
+documentation = "https://docs.rs/small-fsm"
 homepage = "https://github.com/lovelysunlight/fsm-rs"
 repository = "https://github.com/lovelysunlight/fsm-rs"
 readme = "./README.md"

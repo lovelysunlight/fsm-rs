@@ -1,8 +1,8 @@
 //! # FSM for Rust
 //!
 //! [![Build Status](https://github.com/lovelysunlight/fsm-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/lovelysunlight/fsm-rs/actions/workflows/ci.yml)
-//! [![Latest Version](https://img.shields.io/crates/v/scc.svg)](https://crates.io/crates/scc)
-//! [![Rust Documentation](https://docs.rs/scc/badge.svg)](https://docs.rs/scc)
+//! [![Latest Version](https://img.shields.io/crates/v/small-fsm.svg)](https://crates.io/crates/small-fsm)
+//! [![Rust Documentation](https://docs.rs/small-fsm/badge.svg)](https://docs.rs/small-fsm)
 //! [![License Badge](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/lovelysunlight/fsm-rs/main/LICENSE)
 //!
 //! Finite State Machine for Rust.
@@ -13,7 +13,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! scc = "0.1"
+//! small-fsm = "0.1"
 //!
 //! # optional, you can also use `strum` to work with enums and strings easier in Rust.
 //! # strum = { version = "0.26", features = ["derive"] }
@@ -22,7 +22,7 @@
 //! # Example
 //!
 //! ```rust
-//! use scc::{Closure, EventDesc, FSMEvent, FSMState, HookType, FSM};
+//! use small_fsm::{Closure, EventDesc, FSMEvent, FSMState, HookType, FSM};
 //! use std::collections::HashMap;
 //! use strum::AsRefStr;
 //! use strum::Display;
