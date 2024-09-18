@@ -31,10 +31,7 @@ impl<'a, S, I, E: std::error::Error> Action<S, I> for Closure<'a, S, I, E> {
 
 impl<'a, S, I, E> Debug for Closure<'a, S, I, E> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "<Closure<'a, I, E>(Box<dyn Fn(&Event<I>) -> Result<(), E> + 'a>)>"
-        )
+        write!(f, "<Closure>")
     }
 }
 
