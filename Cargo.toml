@@ -1,5 +1,5 @@
 [package]
-name = "fsm"
+name = "scc"
 version = "0.1.0"
 edition = "2021"
 authors = ["JimChen <imjimchen@163.com>"]
