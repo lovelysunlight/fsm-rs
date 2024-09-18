@@ -4,6 +4,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 name: CI
 
 # Adapted from recipe: https://github.com/actions-rs/meta/blob/master/recipes/matrix.md#workflow.
