@@ -129,15 +129,20 @@ where
         let mut callbacks: HashMap<CKey, F> = HashMap::new();
         for (name, callback) in hooks {
             let (target, callback_type) = match name {
-                HookType::BeforeEvent => ("".to_string(), CallbackType::BeforeEvent),
-                HookType::AfterEvent => ("".to_string(), CallbackType::AfterEvent),
-                HookType::Before(t) => (t.as_ref().to_string(), CallbackType::BeforeEvent),
-                HookType::After(t) => (t.as_ref().to_string(), CallbackType::AfterEvent),
+                HookType::BeforeEvent => (Cow::Borrowed(""), CallbackType::BeforeEvent),
+                HookType::AfterEvent => (Cow::Borrowed(""), CallbackType::AfterEvent),
+                HookType::Before(t) => (
+                    Cow::Owned(t.as_ref().to_string()),
+                    CallbackType::BeforeEvent,
+                ),
+                HookType::After(t) => {
+                    (Cow::Owned(t.as_ref().to_string()), CallbackType::AfterEvent)
+                }
 
-                HookType::LeaveState => ("".to_string(), CallbackType::LeaveState),
-                HookType::EnterState => ("".to_string(), CallbackType::EnterState),
-                HookType::Leave(t) => (t.to_string(), CallbackType::LeaveState),
-                HookType::Enter(t) => (t.to_string(), CallbackType::EnterState),
+                HookType::LeaveState => (Cow::Borrowed(""), CallbackType::LeaveState),
+                HookType::EnterState => (Cow::Borrowed(""), CallbackType::EnterState),
+                HookType::Leave(t) => (Cow::Owned(t.to_string()), CallbackType::LeaveState),
+                HookType::Enter(t) => (Cow::Owned(t.to_string()), CallbackType::EnterState),
 
                 HookType::Custom(t) => {
                     let callback_type = if all_states.contains_key(t) {
@@ -147,14 +152,14 @@ where
                     } else {
                         CallbackType::None
                     };
-                    (t.to_string(), callback_type)
+                    (Cow::Borrowed(t), callback_type)
                 }
             };
 
             if callback_type != CallbackType::None {
                 callbacks.insert(
                     CKey {
-                        target: Cow::Owned(target),
+                        target,
                         callback_type,
                     },
                     callback,
