@@ -1,5 +1,5 @@
 #[doc(hidden)]
-use fsm_rs::{Closure, EventDesc, FSMEvent, FSMState, HookType, FSM};
+use fsm::{Closure, EventDesc, FSMEvent, FSMState, HookType, FSM};
 use std::collections::HashMap;
 use strum::AsRefStr;
 use strum::Display;

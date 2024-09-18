@@ -1,7 +1,18 @@
 [package]
-name = "fsm-rs"
+name = "fsm"
 version = "0.1.0"
 edition = "2021"
+authors = ["JimChen <imjimchen@163.com>"]
+license = "MIT"
+organization = "lovelysunlight"
+
+description = "Finite State Machine for Rust"
+keywords = ["finite-state-machine", "fsm", "state-machine", "state", "machine"]
+
+# documentation = "https://docs.rs/fsm"
+homepage = "https://github.com/lovelysunlight/fsm-rs"
+repository = "https://github.com/lovelysunlight/fsm-rs"
+readme = "./README.md"
 
 [features]
 default = []

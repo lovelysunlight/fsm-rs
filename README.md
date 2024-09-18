@@ -1,21 +1,25 @@
 # FSM for Rust
 
-[![Build Badge]][build status]
-[![License Badge]][license]
+[![Build Status](https://github.com/lovelysunlight/fsm-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/lovelysunlight/fsm-rs/actions/workflows/ci.yml)
+[![License Badge](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/lovelysunlight/fsm-rs/main/LICENSE)
 
 Finite State Machine for Rust.
 
 ## Installing
 
-```shell
-$ cargo add fsm-rs
+```toml
+[dependencies]
+fsm = "0.1"
+
+# optional, you can also use `strum` to work with enums and strings easier in Rust.
+# strum = { version = "0.26", features = ["derive"] }
 ```
 
 ## Usage
 
 From examples/basic:
 ```rust
-use fsm_rs::{Closure, EventDesc, FSMEvent, FSMState, HookType, FSM};
+use fsm::{Closure, EventDesc, FSMEvent, FSMState, HookType, FSM};
 use std::collections::HashMap;
 use strum::AsRefStr;
 use strum::Display;
@@ -113,9 +117,3 @@ You can contribute in one of three ways:
 ## License
 
 MIT
-
-
-[build badge]: https://github.com/lovelysunlight/fsm-rs/actions/workflows/ci.yml/badge.svg
-[build status]: https://github.com/lovelysunlight/fsm-rs/actions/workflows/ci.yml
-[license badge]: https://img.shields.io/badge/license-MIT-blue.svg
-[license]: https://raw.githubusercontent.com/lovelysunlight/fsm-rs/main/LICENSE
